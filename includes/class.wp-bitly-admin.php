@@ -158,8 +158,7 @@ class WPBitly_Admin
             wpbitly_debug_log(array('Referer' => $_SERVER['HTTP_REFERER'], 'Query String' => $_SERVER['QUERY_STRING']), 'Authorizing Env');
             wpbitly_debug_log(array('access_token' => $token, 'login' => $login, 'Escaped access_token' => esc_attr($token)), 'Authorizing');
 
-            $wpbitly->setOption('oauth_token', $token);
-            $wpbitly->setOption('oauth_login', $login);
+            $wpbitly->setOption('access_token', $token);
 
             $wpbitly->authorize(true);
 
@@ -170,9 +169,7 @@ class WPBitly_Admin
         if ($auth && isset($_GET['disconnect']) && 'bitly' == $_GET['disconnect']) {
 
             wpbitly_debug_log('', 'Disconnecting');
-            $wpbitly->setOption('oauth_token', '');
-            $wpbitly->setOption('oauth_login', '');
-
+            $wpbitly->setOption('access_token', '');
             $wpbitly->authorize(false);
         }
 
@@ -208,11 +205,10 @@ class WPBitly_Admin
         if (isset($_GET['wpbr']) && isset($_GET['post'])) {
 
             $wpbitly = wpbitly();
-
             if (!$wpbitly->isAuthorized() || !is_numeric($_GET['post'])) {
                 return false;
             }
-
+            
             $post_id = (int)$_GET['post'];
             wpbitly_generate_shortlink($post_id, 1);
 
@@ -238,7 +234,7 @@ class WPBitly_Admin
      * options page, and handle all the callbacks.
      * TODO: Let's separate this into its own class for future expansion. WPBitly_Admin should handle registering hooks only.
      *
-     * @since   2.0
+     * @since   2.6
      */
     public function registerSettings()
     {
@@ -251,7 +247,6 @@ class WPBitly_Admin
             $url = 'https://bitly.com/a/sign_up';
             echo '<p>' . sprintf(__('You will need a Bitly account to use this plugin. If you do not already have one, sign up <a href="%s">here</a>.', 'wp-bitly'), $url) . '</p>';
         }
-
 
         add_settings_field('authorize', '<label for="authorize">' . __('Connect with Bitly', 'wpbitly') . '</label>', '_f_settings_field_authorize', 'writing', 'wpbitly_settings');
         function _f_settings_field_authorize()
@@ -270,10 +265,9 @@ class WPBitly_Admin
 
             } else {
                 $redirect = strtok(home_url($request_uri), '?');
-
-                $url = WPBITLY_TEMERITY_API . '?path=bitly&action=auth&state=' . urlencode($redirect);
+                $url = add_query_arg('access_token', $wpbitly->getOption('access_token'), strtok($redirect, '?'));
+                $url = add_query_arg('login', 'true', strtok($url, '&'));
                 $image = WPBITLY_URL . '/dist/images/b_logo.png';
-
                 $output = sprintf('<a href="%s" class="btn"><span class="btn-content">%s</span><span class="icon"><img src="%s"></span></a>', $url, __('Authorize', 'wp-bitly'), $image);
 
             }
@@ -282,18 +276,27 @@ class WPBitly_Admin
 
         }
 
-
-        add_settings_field('oauth_token', '<label for="oauth_token">' . __('Bitly OAuth Token', 'wpbitly') . '</label>', '_f_settings_field_oauth', 'writing', 'wpbitly_settings');
-        function _f_settings_field_oauth()
+        add_settings_field('access_token', '<label for="access_token">' . __('Bitly Access Token', 'wpbitly') . '</label>', '_f_settings_field_access_token', 'writing', 'wpbitly_settings');
+        function _f_settings_field_access_token()
         {
 
             $wpbitly = wpbitly();
-
+            $url = 'https://support.bitly.com/hc/en-us/articles/230647907-How-do-I-generate-an-OAuth-access-token-for-the-Bitly-API-';
             $auth_css = $wpbitly->isAuthorized() ? '' : ' style="border-color: #c00; background-color: #ffecec;" ';
-            $output = '<input type="text" size="40" name="wpbitly-options[oauth_token]" value="' . esc_attr($wpbitly->getOption('oauth_token')) . '"' . $auth_css . '>';
-            $output .= '<p class="description">' . __('This field should auto-populate after using the authorization button above.', 'wp-bitly') . '<br>';
-            $output .= __('If this field remains empty, please disconnect and attempt to authorize again.', 'wp-bitly') . '</p>';
+            $output = '<input type="text" size="40" name="wpbitly-options[access_token]" value="' . esc_attr($wpbitly->getOption('access_token')) . '"' . $auth_css . '>';
+            $output .= '<p class="description">' . __('To use the Bitly API, you\'ll need an OAuth access token to authorize and authenticate the connection to Bitly. ', 'wp-bitly') . '<br>';
+            $output .= sprintf(__("If you don\'t know how to get access token, visit <a href=\"%s\">support forums</a>.</p>", 'wp-bitly'), $url);
+            
+            echo $output;
 
+        }
+
+        add_settings_field('default_domain', '<label for="default_domain">' . __('Bitly Default Domain', 'wpbitly') . '</label>', '_f_settings_field_default_domain', 'writing', 'wpbitly_settings');
+        function _f_settings_field_default_domain()
+        {
+            $wpbitly = wpbitly();
+            $output = '<input type="text" size="40" name="wpbitly-options[default_domain]" value="' . esc_attr($wpbitly->getOption('default_domain')) . '">';
+            $output .= '<p class="description">' . __('Default domain', 'wp-bitly') . '</p>';
             echo $output;
 
         }
@@ -321,6 +324,20 @@ class WPBitly_Admin
 
         }
 
+        add_settings_field('auto_generate', '<label for="auto_generate">' . __('Automatic Generation', 'wp-bitly') . '</label>', '_f_settings_field_auto_generate', 'writing', 'wpbitly_settings');
+        function _f_settings_field_auto_generate()
+        {
+
+            $wpbitly = wpbitly();
+            $output = '<fieldset>';
+            $output .= '<legend class="screen-reader-text"><span>' . __('Automatic Generation', 'wp-bitly') . '</span></legend>';
+            $output .= '<label title="auto_generate"><input type="checkbox" id="auto_generate" name="wpbitly-options[auto_generate]" value="1" ' . checked($wpbitly->getOption('auto_generate'), 1, 0) . '><span> ' . __("Automatic generation of shortlinks when posts are viewed.",
+                    'wpbitly') . '</span></label>';
+            $output .= '</fieldset>';
+
+            echo $output;
+
+        }
 
         add_settings_field('debug', '<label for="debug">' . __('Debug WP Bitly', 'wp-bitly') . '</label>', '_f_settings_field_debug', 'writing', 'wpbitly_settings');
         function _f_settings_field_debug()
@@ -347,7 +364,7 @@ class WPBitly_Admin
     /**
      * Validate user settings.
      *
-     * @since   2.0
+     * @since   2.6
      * @param   array $input WordPress sanitized data array
      * @return  array           WP Bitly sanitized data
      */
@@ -355,6 +372,7 @@ class WPBitly_Admin
     {
 
         $input['debug'] = ('1' == $input['debug']) ? true : false;
+        $input['auto_generate'] = ('1' == $input['auto_generate']) ? true : false;
 
         if (!isset($input['post_types'])) {
             $input['post_types'] = array();
@@ -420,20 +438,20 @@ class WPBitly_Admin
 
 
         // Retrieve lifetime total
-        $url = sprintf(wpbitly_api('link/clicks'), $wpbitly->getOption('oauth_token'), $shortlink);
-        $response = wpbitly_get($url);
+        $url = sprintf(wpbitly_api('link/clicks/sum'), $shortlink);
+        $response = wpbitly_get($url, $wpbitly->getOption('access_token'));
 
         if (is_array($response)) {
-            $totalclicks = $response['data']['link_clicks'];
+            $totalclicks = $response['total_clicks'];
         }
 
 
         // Retrieve last 7 days of click information (starts at current date and runs back)
-        $url = sprintf(wpbitly_api('link/clicks') . '&units=7&rollup=false', $wpbitly->getOption('oauth_token'), $shortlink);
-        $response = wpbitly_get($url);
+        $url = sprintf(wpbitly_api('link/clicks') . '?unit=day&units=7', $shortlink);
+        $response = wpbitly_get($url, $wpbitly->getOption('access_token'));
 
         if (is_array($response)) {
-            $clicks = $response['data']['link_clicks'];
+            $clicks = $response['link_clicks'];
         }
 
         // Build strings for use in Chartist
@@ -441,7 +459,7 @@ class WPBitly_Admin
         $data_arr = array();
 
         foreach (array_reverse($clicks) as $click) {
-            $labels_arr[] = date('m/d', $click['dt']);
+            $labels_arr[] = date('m/d', strtotime($click['date']));
             $data_arr[] = $click['clicks'];
         }
 

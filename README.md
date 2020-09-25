@@ -17,3 +17,6 @@ Unfortunately, WP Bit.ly plugin has been discontinued. And as the v3 API from bi
 * Please do some research if you have any concerns about features included in this plugin before using it! 
 * Alway install in staging or test environment before using
 
+## TODO
+
+- On/Off: Auto Generate shortlink
