@@ -38,7 +38,7 @@ function wpbitly_debug_log($towrite, $message, $bypass = true)
 /**
  * Retrieve the requested API endpoint.
  *
- * @since 2.0
+ * @since 2.6
  * @param   string $api_call Which endpoint do we need?
  * @return  string Returns the URL for our requested API endpoint
  */
@@ -46,12 +46,10 @@ function wpbitly_api($api_call)
 {
 
     $api_links = array(
-        'shorten' => 'shorten?access_token=%1$s&longUrl=%2$s',
-        'expand' => 'expand?access_token=%1$s&shortUrl=%2$s',
-        'link/clicks' => 'link/clicks?access_token=%1$s&link=%2$s',
-        'link/refer' => 'link/referring_domains?access_token=%1$s&link=%2$s',
-        'user/info' => 'user/info?access_token=%1$s',
-        'user/link_lookup' => 'user/link_lookup?access_token=%1$s&url=%2$s&link=%3$s'
+        'link/qr' => 'bitlinks/%1$s/qr',
+        'link/clicks' => 'bitlinks/%1$s/clicks',
+        'link/clicks/sum' => 'bitlinks/%1$s/clicks/summary',
+        'link/refer' => 'bitlinks/%1$s/referrers',
     );
 
     if (!array_key_exists($api_call, $api_links)) {
@@ -62,18 +60,92 @@ function wpbitly_api($api_call)
 }
 
 /**
+ * Retrieve the POST requested API endpoint.
+ *
+ * @since 2.6
+ * @param   string $api_call Which endpoint do we need?
+ * @param   string $group_guid Which group guid do we need?
+ * @param   string $domain Default is bit.ly or custom domain?
+ * @return  string Returns the body array for our requested API endpoint
+ */
+function wpbitly_api_v4($api_call, $group_guid, $domain)
+{
+    $api_links = array(
+        'shorten' => array(
+            'long_url' => '',
+            'domain'  => $domain,
+            'group_guid' => $group_guid
+        ),
+        'bitlinks' => array(
+            'long_url' => '',
+            'domain'  => $domain,
+            'group_guid' => $group_guid,
+            'title'  => ''
+        ),
+        'expand' => array(
+            'bitlink_id' => '',
+        ),
+    );
+
+    if (!array_key_exists($api_call, $api_links)) {
+        trigger_error(__('WP Bitly Error: No such API endpoint.', 'wp-bitly'));
+    }
+
+    return $api_links[ $api_call ];
+}
+
+/**
  * WP Bitly wrapper for wp_remote_get that verifies a successful response.
  *
- * @since   2.1
+ * @since   2.6
  * @param   string $url The API endpoint we're contacting
+ * @param   string $token API v4 require token in GET request
  * @return  bool|array False on failure, array on success
  */
 
-function wpbitly_get($url)
+function wpbitly_get($url,$token)
 {
 
-    $the = wp_remote_get($url, array('timeout' => '30'));
+    $the = wp_remote_get($url, 
+        array(
+            'timeout' => '30',
+            'headers' => array(
+                'Authorization' => 'Bearer '.$token,
+                'Content-Type'  => 'application/json'
+            )
+    ));
 
+    if (is_array($the) && '200' == $the['response']['code']) {
+        return json_decode($the['body'], true);
+    }
+
+    return false;
+}
+
+/**
+ * WP Bitly wrapper for wp_remote_post that verifies a successful response.
+ *
+ * @since   2.6
+ * @param   string $endpoint The API endpoint we're contacting
+ * @param   string $token The API token
+ * @param   string $args Body of request
+ * @return  bool|array False on failure, array on success
+ */
+
+function wpbitly_post($endpoint,$token,$args = array())
+{
+
+    $body = wp_json_encode( $args , JSON_UNESCAPED_SLASHES);
+    $options = [
+        'body'        => $body,
+        'headers'     => array(
+            'Authorization' => 'Bearer '.$token,
+            'Content-Type'  => 'application/json'
+        ),
+        'timeout'     => 30,
+        'sslverify' => true,
+    ];
+    $the = wp_remote_post(WPBITLY_BITLY_API . $endpoint, $options);
     if (is_array($the) && '200' == $the['response']['code']) {
         return json_decode($the['body'], true);
     }
@@ -84,7 +156,7 @@ function wpbitly_get($url)
 /**
  * Generates the shortlink for the post specified by $post_id.
  *
- * @since   0.1
+ * @since   2.6
  * @param   int $post_id Identifies the post being shortened
  * @param   bool $bypass True bypasses the link expand API check
  * @return  bool|string  Returns the shortlink on success
@@ -109,27 +181,29 @@ function wpbitly_generate_shortlink($post_id, $bypass = false)
     // We made it this far? Let's get a shortlink
     $permalink = get_permalink($post_id);
     $shortlink = get_post_meta($post_id, '_wpbitly', true);
-    $token = $wpbitly->getOption('oauth_token');
+    $token = $wpbitly->getOption('access_token');
+    $domain = $wpbitly->getOption('default_domain');
+    $group_guid = $wpbitly->getOption('group_guid');
 
     if (!empty($shortlink) && !$bypass) {
-        $url = sprintf(wpbitly_api('expand'), $token, $shortlink);
-        $response = wpbitly_get($url);
+        $body = array_replace(wpbitly_api_v4('expand', $group_guid, $domain), array("bitlink_id" => $shortlink ));
+        $response = wpbitly_post('expand',$token,$body);
 
         wpbitly_debug_log($response, '/expand/');
 
-        if (is_array($response) && $permalink == $response['data']['expand'][0]['long_url']) {
+        if (is_array($response) && $permalink == $response['long_url']) {
             update_post_meta($post_id, '_wpbitly', $shortlink);
             return $shortlink;
         }
     }
-
-    $url = sprintf(wpbitly_api('shorten'), $token, urlencode($permalink));
-    $response = wpbitly_get($url);
-
-    wpbitly_debug_log($response, '/shorten/');
+    $body = array_replace(wpbitly_api_v4('bitlinks', $group_guid, $domain), array("long_url" => $permalink, "title" => get_the_title($post_id)));
+    
+    $response = wpbitly_post('bitlinks',$token,$body);
+    
+    wpbitly_debug_log($response, '/bitlinks/');
 
     if (is_array($response)) {
-        $shortlink = $response['data']['url'];
+        $shortlink = $response['id'];
         update_post_meta($post_id, '_wpbitly', $shortlink);
     }
 
@@ -174,12 +248,11 @@ function wpbitly_get_shortlink($original, $post_id)
             $shortlink = wpbitly_generate_shortlink($post_id);
         }
     }
-
     return ($shortlink) ? $shortlink : $original;
 }
 
 /**
- * This can be used as a direct php call within a theme or another plugin. It also handles the [wp_bitly] shortcode.
+ * This can be used as a direct php call within a theme or another plugin. It also handles the [wpbitly] shortcode.
  *
  * @since   0.1
  * @param   array $atts Default shortcode attributes

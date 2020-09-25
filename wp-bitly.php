@@ -13,7 +13,7 @@
  *            Plugin Name:       WP Bitly
  *            Plugin URI:        http://wordpress.org/plugins/wp-bitly
  *            Description:       WP Bitly can be used to generate shortlinks for your website posts, pages, and custom post types. Extremely lightweight and easy to set up!
- *            Version:            2.5.2
+ *            Version:            2.6
  *            Author:            <a href="https://temeritystudios.com/">Temerity Studios</a>
  *            Text Domain:       wp-bitly
  *            License:           GPL-2.0+
@@ -27,7 +27,7 @@ if (!defined('WPINC')) {
 }
 
 
-define('WPBITLY_VERSION', ' 2.5.2');
+define('WPBITLY_VERSION', ' 2.6');
 
 define('WPBITLY_DIR', WP_PLUGIN_DIR . '/' . basename(dirname(__FILE__)));
 define('WPBITLY_URL', plugins_url() . '/' . basename(dirname(__FILE__)));
@@ -38,8 +38,7 @@ define('WPBITLY_ERROR', __('WP Bitly Error: No such option %1$s', 'wp-bitly'));
 define('WPBITLY_OPTIONS', 'wpbitly-options');
 define('WPBITLY_AUTHORIZED', 'wpbitly-authorized');
 
-define('WPBITLY_BITLY_API', 'https://api-ssl.bitly.com/v3/');
-define('WPBITLY_TEMERITY_API', 'https://api.temeritystudios.com/');
+define('WPBITLY_BITLY_API', 'https://api-ssl.bitly.com/v4/');
 
 /**
  * The primary controller class for everything wonderful that WP Bitly does.
@@ -88,16 +87,18 @@ final class WPBitly
     /**
      * Populate WPBitly::$options with the configuration settings.
      *
-     * @since 2.0
+     * @since 2.6
      */
     public function populateOptions()
     {
 
         $defaults = apply_filters('wpbitly_default_options', array(
             'version' => WPBITLY_VERSION,
-            'oauth_token' => '',
-            'oauth_login' => '',
+            'access_token' => '',
+            'group_guid' => '',
+            'default_domain' => 'bit.ly',
             'post_types' => array('post', 'page'),
+            'auto_generate' => false,
             'debug' => false,
         ));
 

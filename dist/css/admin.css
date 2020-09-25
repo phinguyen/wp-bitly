@@ -6,8 +6,8 @@
   color: #eb6123;
   text-decoration: none;
   line-height: 1;
-  -webkit-box-shadow: 0 0 0 transparent;
-          box-shadow: 0 0 0 transparent;
+  -webkit-box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+          box-shadow: 0 0 0 rgba(0, 0, 0, 0);
   background-color: #fff;
   border: 3px solid #eb6123;
   border-radius: 8px;
@@ -149,3 +149,9 @@
   font-weight: 300;
   text-align: center;
 }
+
+#wpadminbar .shortlink-input {
+  padding: 0 15px;
+  color: white;
+}
+/*# sourceMappingURL=admin.css.map */

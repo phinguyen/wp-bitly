@@ -9,12 +9,13 @@
     </div>
 
     <div id="getshortlink-action">
-        <button type="button" class="button button-large" onclick="prompt('URL:', jQuery('#shortlink').val());">Get Shortlink</button>
+        <button type="button" class="button button-large" onclick="prompt('URL:', jQuery('.shortlink-input').val());">Get Shortlink</button>
     </div>
     <div class="clear"></div>
 </div>
 
 <script>
+  
   new Chartist.Line('.wpbitly-chart', {
     labels: [<?php echo $labels_js; ?>],
     series: [
