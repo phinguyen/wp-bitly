@@ -252,7 +252,7 @@ function wpbitly_get_shortlink($original, $post_id)
 }
 
 /**
- * This can be used as a direct php call within a theme or another plugin. It also handles the [wp_bitly] shortcode.
+ * This can be used as a direct php call within a theme or another plugin. It also handles the [wpbitly] shortcode.
  *
  * @since   0.1
  * @param   array $atts Default shortcode attributes
