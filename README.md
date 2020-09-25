@@ -1,6 +1,7 @@
 # WP Bitly
+Bit.ly v4 API WordPress plugin
 
-This the GitHub development repository for the WordPress plugin found [here](https://wordpress.org/plugins/wp-bitly/).
+This is a forked from [wp-bitly](https://github.com/temeritystudios/wp-bitly) by [temeritystudios](https://github.com/temeritystudios).
 
 Use the Bitly API to generate shortlinks for all of your posts and pages instead of the internal http://www.yourdomain.com/?p=1 short links WordPress generates.
 
@@ -19,3 +20,6 @@ Unfortunately, WP Bit.ly plugin has been discontinued. And as the v3 API from bi
 ## TODO
 
 - On/Off: Auto Generate shortlink
+
+Tags: shortlink, short, link, bitly, url, shortener, social, media, twitter, share
+Tested: 5.5.1
